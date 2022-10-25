@@ -1,0 +1,28 @@
+{
+  "name": "dk-ok-bot",
+  "author": "Zenkaku Hiragana and C2H4",
+  "version": "1.0.0",
+  "dependencies": {
+    "@discordjs/opus": "^0.5.3",
+    "@discordjs/voice": "^0.6.0",
+    "discord.js": "^13.2.0",
+    "ffmpeg": "^0.0.4",
+    "tweetnacl": "^1.0.3",
+    "ytdl-core": "^4.9.1",
+    "ytpl": "^2.2.3"
+  },
+  "description": "",
+  "engines": {
+    "node": "16.x"
+  },
+  "keywords": [],
+  "license": "ISC",
+  "main": "DK_OK_bot.js",
+  "repository": {
+    "type": "git",
+    "url": "https://git.heroku.com/dk-ok-bot-js.git"
+  },
+  "scripts": {
+    "start": "node ./DK_OK_bot.js"
+  }
+}

@@ -1,0 +1,1 @@
+worker: node ./DK_OK_bot.js
