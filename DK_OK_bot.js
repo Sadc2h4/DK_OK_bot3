@@ -13,15 +13,11 @@
 // デプロイ参考: https://qiita.com/InkoHX/items/590b5f15426a6e813e92
 
 // Renderに置く場合、HTTPリクエストを何か処理できる能力がないとダメらしい
-const http = require('http');
-const httpServer = new http.createServer(requestListener = (request, response) => {
-    console.log(`url:${request.url}`);
-    console.log(`method:${request.method}`);
-	response.writeHead(statusCode = 200, headers = {'Content-Type': 'text/html'});
-	response.end(data = '<h1>DK OK &#x1F4AA;&#x1F98D;</h1>\n');
-});
-
-httpServer.listen(port = 8080);
+const express = require("express");
+const app = express();
+const port = process.env.PORT || 3001;
+app.get("/", (_, res) => res.type('html').send('<h1>DK OK &#x1F4AA;&#x1F98D;</h1>\n'));
+app.listen(port, () => console.log(`DK OK bot is listening on port ${port}!`));
 
 const ytpl = require('ytpl')
 const Discord = require('discord.js');
