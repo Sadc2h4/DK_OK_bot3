@@ -20,7 +20,7 @@
   "main": "DK_OK_bot.js",
   "repository": {
     "type": "git",
-    "url": "https://git.heroku.com/dk-ok-bot-js.git"
+    "url": "https://github.com/dk-ok-bot-js.git"
   },
   "scripts": {
     "start": "node ./DK_OK_bot.js"
