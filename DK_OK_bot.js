@@ -12,6 +12,17 @@
 // Base example taken from https://gabrieltanner.org/blog/dicord-music-bot
 // デプロイ参考: https://qiita.com/InkoHX/items/590b5f15426a6e813e92
 
+// Renderに置く場合、HTTPリクエストを何か処理できる能力がないとダメらしい
+const http = require('http');
+const httpServer = new http.createServer(requestListener = (request, response) => {
+    console.log(`url:${request.url}`);
+    console.log(`method:${request.method}`);
+	response.writeHead(statusCode = 200, headers = {'Content-Type': 'text/html'});
+	response.end(data = '<h1>DK OK &#x1F4AA;&#x1F98D;</h1>\n');
+});
+
+httpServer.listen(port = 8080);
+
 const ytpl = require('ytpl')
 const Discord = require('discord.js');
 const { joinVoiceChannel, StreamType } = require('@discordjs/voice');
@@ -27,10 +38,10 @@ const subscriptions = new Map(); // Audio subscriptions
 
 const client = new Discord.Client({
 	intents: [
-		Discord.Intents.FLAGS.GUILDS,
-		Discord.Intents.FLAGS.GUILD_MESSAGES,
-		Discord.Intents.FLAGS.GUILD_MESSAGE_TYPING,
-		Discord.Intents.FLAGS.GUILD_VOICE_STATES
+		Discord.IntentsBitField.Flags.Guilds,
+		Discord.IntentsBitField.Flags.GuildMessages,
+		Discord.IntentsBitField.Flags.GuildMessageTyping,
+		Discord.IntentsBitField.Flags.GuildVoiceStates
 	]
 });
 
