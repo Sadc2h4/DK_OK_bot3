@@ -37,7 +37,8 @@ const client = new Discord.Client({
 		Discord.IntentsBitField.Flags.Guilds,
 		Discord.IntentsBitField.Flags.GuildMessages,
 		Discord.IntentsBitField.Flags.GuildMessageTyping,
-		Discord.IntentsBitField.Flags.GuildVoiceStates
+		Discord.IntentsBitField.Flags.GuildVoiceStates,
+		Discord.GatewayIntentBits.MessageContent
 	]
 });
 
@@ -235,7 +236,7 @@ async function execute(message) {
 	const voiceChannel = message.member.voice.channel;
 	const permissions = voiceChannel?.permissionsFor(message.client.user);
 	if (!voiceChannel) return message.channel.send("You need to be in a voice channel to play music!");
-	if (!permissions?.has("CONNECT") || !permissions?.has("SPEAK")) {
+	if (!permissions?.has(Discord.PermissionsBitField.Flags.Connect) || !permissions?.has(Discord.PermissionsBitField.Flags.Speak)) {
 		return message.channel.send("I need the permissions to join and speak in your voice channel!");
 	}
 
