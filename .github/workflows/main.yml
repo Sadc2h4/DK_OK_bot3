@@ -2,6 +2,7 @@ name: Launch DK_OK_bot3
 
 on:
   workflow_dispatch:
+  workflow_call:
 
 jobs:
   launch-dk-ok-bot:
