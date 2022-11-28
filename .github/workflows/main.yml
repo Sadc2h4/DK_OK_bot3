@@ -3,6 +3,8 @@ name: Launch DK_OK_bot3
 on:
   workflow_dispatch:
   workflow_call:
+  schedule:
+    - cron: "0 */6 * * *"
 
 jobs:
   launch-dk-ok-bot:
