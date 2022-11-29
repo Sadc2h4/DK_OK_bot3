@@ -14,10 +14,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - name: Use Node.js ${{ env.NODE_VERSION }}
+    - name: Setup Node.js ${{ env.NODE_VERSION }}
       uses: actions/setup-node@v3
       with:
         node-version: ${{ env.NODE_VERSION }}
         cache: 'npm'
-    - run: npm install
-    - run: node DK_OK_bot.js
+    - name: Setup DK_OK_bot
+      run: npm install
+    - name: Run DK_OK_bot
+      continue-on-error: true
+      run: node DK_OK_bot.js
