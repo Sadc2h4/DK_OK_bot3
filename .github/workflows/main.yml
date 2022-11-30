@@ -23,4 +23,5 @@ jobs:
       run: npm install
     - name: Run DK_OK_bot
       continue-on-error: true
+      timeout-minutes: 357
       run: node DK_OK_bot.js
