@@ -3,8 +3,8 @@ name: Launch DK_OK_bot3
 on:
   workflow_dispatch:
   workflow_call:
-  schedule:
-    - cron: "0 */6 * * *"
+  # schedule:
+  #  - cron: "0 */6 * * *"
 
 env:
   DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
