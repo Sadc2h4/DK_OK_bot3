@@ -107,22 +107,24 @@ async function play(guild, song) {
 			const current = resource.playbackDuration;
 			message.edit(`\`${formatTime(current)} / ${duration}\``).catch(console.error);
 		}, 1000);
+		audioPlayer.addListener("stateChange", (_, after) => {
+			if (after.status !== "idle" && after.status !== "autopaused") return;
+			clearInterval(id);
+			message.delete();
+			title.delete();
+			serverQueue.songs?.shift();
+			if (serverQueue.songs.length > 0) {
+				play(guild, serverQueue.songs[0]);
+			}
+			else {
+				queue.delete(guild.id);
+				subscriptions.delete(guild.id);
+			}
+		});
 		
 		audioPlayer.play(resource); // 再生
 		await entersState(audioPlayer, AudioPlayerStatus.Playing, 10 * 1000);
 		await entersState(audioPlayer, AudioPlayerStatus.Idle, 24 * 60 * 60 * 1000);
-
-		clearInterval(id);
-		message.delete();
-		title.delete();
-		serverQueue.songs?.shift();
-		if (serverQueue.songs.length > 0) {
-			play(guild, serverQueue.songs[0]);
-		}
-		else {
-			queue.delete(guild.id);
-			subscriptions.delete(guild.id);
-		}
 	}
 	catch (error) {
 		console.error(error);
@@ -266,10 +268,13 @@ functionTable.set("stop", function(interaction) { // 曲の再生を止め、再
 	const connection = getVoiceConnection(interaction.guild.id);
 	const serverQueue = queue.get(interaction.guild.id);
 	const ss = subscriptions.get(interaction.guild.id);
+	if (ss?.player) {
+		ss.player.stop();
+		ss.player.emit("stateChange", "", "idle");
+	}
 	if (connection) connection.destroy();
 	if (serverQueue) queue.delete(interaction.guild.id);
 	if (ss) subscriptions.delete(interaction.guild.id);
-	if (ss?.player) ss.player.stop();
 	interaction.deleteReply();
 });
 functionTable.set("clear", function(interaction) { // 再生キューを全消去する
