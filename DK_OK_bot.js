@@ -290,7 +290,7 @@ functionTable.set("queue", function(interaction) { // 再生キューをチャ�
 
 	let msg = "Queue:\n";
 	for (let i = 0; i < songs.length; ++i) {
-		msg += `  ${i}. **${songs[i].title}**\n`
+		msg += `  ${i + 1}. **${songs[i].title}**\n`
 		if (i > MaxSongsToShow) {
 			msg += "  ...";
 			break;
