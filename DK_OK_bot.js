@@ -21,6 +21,7 @@ const {
 	getVoiceConnection,
 	joinVoiceChannel,
 } = require('@discordjs/voice');
+const { ApplicationCommandType, ApplicationCommandOptionType } = require("discord.js");
 
 const queue = new Map();         // Song queue
 const subscriptions = new Map(); // Audio subscriptions
@@ -323,7 +324,75 @@ client.on('interactionCreate', async interaction => {
 	if (cmdMatch.length > 0) return functionTable.get(cmdMatch[0])?.(interaction);
 });
 
-client.once('ready',        () => { console.log('Ready!'); });
+client.on("ready", async () => {
+    console.log(`${client.user.tag} has logged in.`);
+	client.user.setActivity(`/help | ${client.user.username}`, { type: "PLAYING" });
+	await client.application.commands.set([
+		{
+			'name': 'play',
+			'type': ApplicationCommandType.ChatInput,
+			'description': 'YouTubeのURLを指定してプレイリストに追加します。',
+			'options': [
+				{
+					'name': 'url',
+					'description': 'YouTubeのURL。プレイリストのURLを指定することも可能。',
+					'type': ApplicationCommandOptionType.String,
+					'required': true,
+				},
+				{
+					'name': 'option',
+					'description': '追加のオプション。',
+					'type': ApplicationCommandOptionType.String,
+					'required': false,
+					'choices': [
+						{
+							'name': '今すぐ再生',
+							'value': 'now',
+						},
+						{
+							'name': 'シャッフル再生',
+							'value': 'shuffle',
+						},
+						{
+							'name': '次に再生',
+							'value': 'next',
+						}
+					],
+				},
+			],
+		},
+		{
+			'name': 'skip',
+			'type': ApplicationCommandType.ChatInput,
+			'description': '現在再生中の曲をスキップします。',
+		},
+		{
+			'name': 'stop',
+			'type': ApplicationCommandType.ChatInput,
+			'description': '再生を停止し、プレイリストを消去し、ボイスチャンネルから切断します。',
+		},
+		{
+			'name': 'clear',
+			'type': ApplicationCommandType.ChatInput,
+			'description': 'プレイリストを消去します。',
+		},
+		{
+			'name': 'shuffle',
+			'type': ApplicationCommandType.ChatInput,
+			'description': 'プレイリストをシャッフルします。',
+		},
+		{
+			'name': 'queue',
+			'type': ApplicationCommandType.ChatInput,
+			'description': 'プレイリストを表示します。',
+		},
+		{
+			'name': 'upnext',
+			'type': ApplicationCommandType.ChatInput,
+			'description': '次に再生する曲を表示します。',
+		}
+	]);
+});
 client.once('reconnecting', () => { console.log('Reconnecting!'); });
 client.once('disconnect',   () => { console.log('Disconnect!'); });
 client.login();
