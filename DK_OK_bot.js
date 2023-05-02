@@ -21,7 +21,10 @@ const {
 	getVoiceConnection,
 	joinVoiceChannel,
 } = require('@discordjs/voice');
-const { ApplicationCommandType, ApplicationCommandOptionType } = require("discord.js");
+const {
+	ApplicationCommandType,
+	ApplicationCommandOptionType,
+} = require("discord.js");
 
 const queue = new Map();         // Song queue
 const subscriptions = new Map(); // Audio subscriptions
@@ -82,6 +85,20 @@ async function play(guild, song) {
 	const connection = getVoiceConnection(guild.id);
 	if (!song) return;
 
+	// [Workaround!!]
+	// https://github.com/discordjs/discord.js/issues/9185#issuecomment-1452514375
+	connection.on('stateChange', (before, after) => {
+		const oldNetworking = Reflect.get(before, 'networking');
+		const newNetworking = Reflect.get(after, 'networking');
+		const networkStateChangeHandler = (_, newNetworkState) => {
+			const newUdp = Reflect.get(newNetworkState, 'udp');
+			clearInterval(newUdp?.keepAliveInterval);
+		}
+
+		oldNetworking?.off('stateChange', networkStateChangeHandler);
+		newNetworking?.on('stateChange', networkStateChangeHandler);
+	});
+
 	try {
 		// https://scrapbox.io/discordjs-japan/ytdl-core_を使用して_YouTube_の音源を配信するサンプル
 		const audioPlayer = createAudioPlayer();
@@ -109,6 +126,7 @@ async function play(guild, song) {
 			message.edit(`\`${formatTime(current)} / ${duration}\``).catch(console.error);
 		}, 1000);
 		audioPlayer.addListener("stateChange", (_, after) => {
+			console.log(`[Player status] ${_.status} -> ${after.status}`);
 			if (after.status !== "idle" && after.status !== "autopaused") return;
 			clearInterval(id);
 			message.delete();
