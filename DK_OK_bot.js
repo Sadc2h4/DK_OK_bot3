@@ -1,8 +1,8 @@
 
-// Base example taken from https://gabrieltanner.org/blog/dicord-music-bot
-
+const request = require('request');
+const NsfPlayer = require('./nsf-player');
 // Renderに置く場合、HTTPリクエストを何か処理できる能力がないとダメらしい
-const express = require("express");
+const express = require('express');
 const app = express();
 const port = process.env.PORT || 3001;
 app.get("/", (_, res) => res.type('html').send('<h1>DK OK &#x1F4AA;&#x1F98D;</h1>\n'));
@@ -25,6 +25,7 @@ const {
 	ApplicationCommandType,
 	ApplicationCommandOptionType,
 } = require("discord.js");
+const { createReadStream } = require('fs');
 
 const queue = new Map();         // Song queue
 const subscriptions = new Map(); // Audio subscriptions
@@ -103,6 +104,27 @@ async function play(guild, song) {
 		// https://scrapbox.io/discordjs-japan/ytdl-core_を使用して_YouTube_の音源を配信するサンプル
 		const audioPlayer = createAudioPlayer();
 		subscriptions.set(guild.id, connection.subscribe(audioPlayer));
+		
+		if (song.nsf) {
+			const player = new NsfPlayer(song.nsf, song.trackNumber || 0);
+			const resource = createAudioResource(player, { inputType: StreamType.Raw });
+			audioPlayer.addListener("stateChange", (_, after) => {
+				console.log(`[Player status] ${_.status} -> ${after.status}`);
+				if (after.status !== "idle" && after.status !== "autopaused") return;
+				serverQueue.songs?.shift();
+				if (serverQueue.songs.length > 0) {
+					play(guild, serverQueue.songs[0]);
+				}
+				else {
+					queue.delete(guild.id);
+					subscriptions.delete(guild.id);
+				}
+			});
+			audioPlayer.play(resource);
+			await entersState(audioPlayer, AudioPlayerStatus.Playing, 10 * 1000);
+			await entersState(audioPlayer, AudioPlayerStatus.Idle, 24 * 60 * 60 * 1000);
+			return;
+		}
 		const videoID = ytdl.getURLVideoID(song.url);
 		const info = await ytdl.getInfo(song.url);
 		let type = StreamType.WebmOpus;
@@ -196,6 +218,26 @@ function pushQueue(interaction, song, gag, insertNext) {
 	if (gag) return;
 	return interaction.editReply(`**${song.title}** has been added to the queue!`);
 }
+async function startPlaying(interaction, playLater) {
+	try {
+		// Calling the play function to start a song
+		const serverQueue = queue.get(interaction.guild.id);
+		const ss = subscriptions.get(interaction.guild.id);
+		if (!serverQueue) return;
+		if (ss?.player) {
+			if (playLater) return;
+			return ss.player.stop();
+		}
+		else {
+			play(interaction.guild, serverQueue.songs[0]);
+		}
+	}
+	catch (error) {
+		console.error("Error at playing a song");
+		console.error(error);
+		return await interaction.editReply("Failed to play a song!");
+	}
+}
 
 functionTable.set("shuffle", shuffle);
 functionTable.set("play", async function(interaction) { // !playのパラメータ解析と曲の追加 → 再生
@@ -257,25 +299,7 @@ functionTable.set("play", async function(interaction) { // !playのパラメー�
 			return await interaction.editReply("I can't fetch video info!");
 		}
 	}
-	
-	try {
-		// Calling the play function to start a song
-		const serverQueue = queue.get(interaction.guild.id);
-		const ss = subscriptions.get(interaction.guild.id);
-		if (!serverQueue) return;
-		if (ss?.player) {
-			if (aux !== keywords[2]) return;
-			return ss.player.stop();
-		}
-		else {
-			play(interaction.guild, serverQueue.songs[0]);
-		}
-	}
-	catch (error) {
-		console.error("Error at playing a song");
-		console.error(error);
-		return await interaction.editReply("Failed to play a song!");
-	}
+	startPlaying(interaction, aux !== keywords[2]);
 });
 functionTable.set("skip", function(interaction) { // 現在再生中の曲をスキップして次の曲を流す
 	const ss = subscriptions.get(interaction.guild.id);
@@ -333,6 +357,27 @@ functionTable.set("upnext", function(interaction) { // 次の曲を表示する
 		interaction.editReply(`Up next ~ **${songs[1].title}**\n${songs[1].url}`);
 	}
 	setTimeout(() => { interaction.deleteReply(); }, 1000 * 5);
+});
+functionTable.set("nsf", async function(interaction) { // NSFを再生する
+	setTimeout(() => { interaction.deleteReply(); }, 1000 * 5);
+	const att = interaction.options.getAttachment('nsf');
+	const aux = interaction.options.getString('option');
+	const track = interaction.options.getInteger('track');
+	const keywords = ["shuffle", "next", "now"];
+	const req = request.defaults({ encoding: null });
+	req.get(att.url, (error, response, body) => {
+		if (error || response.statusCode !== 200) {
+			console.error("Failed to load NSF", error, response.statusCode);
+			return interaction.editReply("Failed to load NSF!");
+		}
+		pushQueue(interaction, {
+			interaction: interaction,
+			nsf: body,
+			trackNumber: track,
+			title: "NSF",
+		}, false, aux === keywords[1] || aux == keywords[2]);
+		startPlaying(interaction, aux !== keywords[2]);
+	});
 });
 client.on('interactionCreate', async interaction => {
 	await interaction.reply('｡ﾟ(ﾟ´ω`ﾟ)ﾟ｡');
@@ -408,6 +453,46 @@ client.on("ready", async () => {
 			'name': 'upnext',
 			'type': ApplicationCommandType.ChatInput,
 			'description': '次に再生する曲を表示します。',
+		},
+		{
+			'name': 'nsf',
+			'type': ApplicationCommandType.ChatInput,
+			'description': '添付されたNSFファイルをプレイリストに追加します。',
+			'options': [
+				{
+					'name': 'nsf',
+					'description': 'NSFファイル。',
+					'type': ApplicationCommandOptionType.Attachment,
+					'required': true,
+				},
+				{
+					'name': 'track',
+					'description': 'NSFファイルのトラック番号。0から始まる。',
+					'type': ApplicationCommandOptionType.Integer,
+					'min_value': 0,
+					'required': false,
+				},
+				{
+					'name': 'option',
+					'description': '追加のオプション。',
+					'type': ApplicationCommandOptionType.String,
+					'required': false,
+					'choices': [
+						{
+							'name': '今すぐ再生',
+							'value': 'now',
+						},
+						{
+							'name': 'シャッフル再生',
+							'value': 'shuffle',
+						},
+						{
+							'name': '次に再生',
+							'value': 'next',
+						}
+					],
+				},
+			]
 		}
 	]);
 });
