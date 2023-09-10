@@ -11,7 +11,7 @@ app.listen(port, () => console.log(`DK OK bot is listening on port ${port}!`));
 const ytpl      = require('ytpl');
 const ytdl      = require('ytdl-core');
 const Discord   = require('discord.js');
-const { parse } = require("url");
+const { parse, URL } = require("url");
 const {
 	AudioPlayerStatus,
 	StreamType,
@@ -26,6 +26,7 @@ const {
 	ApplicationCommandOptionType,
 } = require("discord.js");
 const { createReadStream } = require('fs');
+const { Stream } = require('stream');
 
 const queue = new Map();         // Song queue
 const subscriptions = new Map(); // Audio subscriptions
@@ -105,9 +106,28 @@ async function play(guild, song) {
 		const audioPlayer = createAudioPlayer();
 		subscriptions.set(guild.id, connection.subscribe(audioPlayer));
 		
-		if (song.nsf) {
-			const player = new NsfPlayer(song.nsf, song.trackNumber || 0);
+		if (song.chiptune) {
+			const player = new NsfPlayer(song.chiptune, song.trackNumber || 0);
 			const resource = createAudioResource(player, { inputType: StreamType.Raw });
+			audioPlayer.addListener("stateChange", (_, after) => {
+				console.log(`[Player status] ${_.status} -> ${after.status}`);
+				if (after.status !== "idle" && after.status !== "autopaused") return;
+				serverQueue.songs?.shift();
+				if (serverQueue.songs.length > 0) {
+					play(guild, serverQueue.songs[0]);
+				}
+				else {
+					queue.delete(guild.id);
+					subscriptions.delete(guild.id);
+				}
+			});
+			audioPlayer.play(resource);
+			await entersState(audioPlayer, AudioPlayerStatus.Playing, 10 * 1000);
+			await entersState(audioPlayer, AudioPlayerStatus.Idle, 24 * 60 * 60 * 1000);
+			return;
+		}
+		else if (song.rawurl) {
+			const resource = createAudioResource(song.rawurl, { type: StreamType.Arbitrary });
 			audioPlayer.addListener("stateChange", (_, after) => {
 				console.log(`[Player status] ${_.status} -> ${after.status}`);
 				if (after.status !== "idle" && after.status !== "autopaused") return;
@@ -254,18 +274,28 @@ functionTable.set("play", async function(interaction) { // !playのパラメー�
 
 	// optionの解析
 	let url = interaction.options.getString('url');
-	const shortened  = url.includes("youtu.be");
+	const isdropbox = url.includes("dropbox.com");
+	const shortened = url.includes("youtu.be");
 	const aux = interaction.options.getString('option');
 	const keywords = ["shuffle", "next", "now"];
 	
 	// URLが与えられている時
-	const validVideo = parameterExists(url, "v")     || ytdl.validateID(url);
-	const validList = !parameterExists(url, "index") && ytpl.validateID(url);
 	if (shortened) {
-		const parsed = parse(url, true);
-		const id = parsed.pathname.toString().replace(/\//g, "");
+		const parsed = new URL(url);
+		const id = parsed.pathname.replace(/\//g, "");
 		url = `https://www.youtube.com/watch?v=${id}`;
 	}
+	else if (isdropbox) {
+		const parsed = new URL(url);
+		parsed.searchParams.set("raw", "1");
+		pushQueue(interaction, {
+			interaction: interaction,
+			title: "Dropbox",
+			rawurl: parsed.toString(),
+		}, false, aux === keywords[1] || aux === keywords[2]);
+	}
+	const validVideo = parameterExists(url, "v")     || ytdl.validateID(url);
+	const validList = !parameterExists(url, "index") && ytpl.validateID(url);
 	if (validList) { // プレイリストの追加
 		try {
 			const pl = await ytpl(url, { limit: Infinity });
@@ -285,14 +315,14 @@ functionTable.set("play", async function(interaction) { // !playのパラメー�
 			return await interaction.editReply("I can't fetch playlist info!");
 		}
 	}
-	else if (validVideo || shortened) { // 曲の追加
+	else if (validVideo) { // 曲の追加
 		try {
 			const songInfo = await ytdl.getInfo(url);
 			await pushQueue(interaction, {
 				interaction: interaction,
 				title: songInfo.videoDetails.title,
 				url: songInfo.videoDetails.video_url,
-			}, false, aux === keywords[1] || aux == keywords[2]);
+			}, false, aux === keywords[1] || aux === keywords[2]);
 		}
 		catch (error) {
 			console.error(error);
@@ -358,9 +388,9 @@ functionTable.set("upnext", function(interaction) { // 次の曲を表示する
 	}
 	setTimeout(() => { interaction.deleteReply(); }, 1000 * 5);
 });
-functionTable.set("nsf", async function(interaction) { // NSFを再生する
+functionTable.set("chiptune", async function(interaction) { // NSFを再生する
 	setTimeout(() => { interaction.deleteReply(); }, 1000 * 5);
-	const att = interaction.options.getAttachment('nsf');
+	const att = interaction.options.getAttachment('chiptune');
 	const aux = interaction.options.getString('option');
 	const track = interaction.options.getInteger('track');
 	const keywords = ["shuffle", "next", "now"];
@@ -372,10 +402,10 @@ functionTable.set("nsf", async function(interaction) { // NSFを再生する
 		}
 		pushQueue(interaction, {
 			interaction: interaction,
-			nsf: body,
+			chiptune: body,
 			trackNumber: track,
 			title: "NSF",
-		}, false, aux === keywords[1] || aux == keywords[2]);
+		}, false, aux === keywords[1] || aux === keywords[2]);
 		startPlaying(interaction, aux !== keywords[2]);
 	});
 });
@@ -400,7 +430,7 @@ client.on("ready", async () => {
 					'name': 'url',
 					'description': 'YouTubeのURL。プレイリストのURLを指定することも可能。',
 					'type': ApplicationCommandOptionType.String,
-					'required': true,
+					'required': false,
 				},
 				{
 					'name': 'option',
@@ -455,19 +485,19 @@ client.on("ready", async () => {
 			'description': '次に再生する曲を表示します。',
 		},
 		{
-			'name': 'nsf',
+			'name': 'chiptune',
 			'type': ApplicationCommandType.ChatInput,
-			'description': '添付されたNSFファイルをプレイリストに追加します。',
+			'description': 'NSF, SPC, GBSファイルをプレイリストに追加します。',
 			'options': [
 				{
-					'name': 'nsf',
-					'description': 'NSFファイル。',
+					'name': 'chiptune',
+					'description': 'NSF, SPC, GBSファイル。',
 					'type': ApplicationCommandOptionType.Attachment,
 					'required': true,
 				},
 				{
 					'name': 'track',
-					'description': 'NSFファイルのトラック番号。0から始まる。',
+					'description': 'NSF, SPC, GBSファイルのトラック番号。0から始まる。',
 					'type': ApplicationCommandOptionType.Integer,
 					'min_value': 0,
 					'required': false,
