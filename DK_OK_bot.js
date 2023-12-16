@@ -87,24 +87,11 @@ async function play(guild, song) {
 	const connection = getVoiceConnection(guild.id);
 	if (!song) return;
 
-	// [Workaround!!]
-	// https://github.com/discordjs/discord.js/issues/9185#issuecomment-1452514375
-	connection.on('stateChange', (before, after) => {
-		const oldNetworking = Reflect.get(before, 'networking');
-		const newNetworking = Reflect.get(after, 'networking');
-		const networkStateChangeHandler = (_, newNetworkState) => {
-			const newUdp = Reflect.get(newNetworkState, 'udp');
-			clearInterval(newUdp?.keepAliveInterval);
-		}
-
-		oldNetworking?.off('stateChange', networkStateChangeHandler);
-		newNetworking?.on('stateChange', networkStateChangeHandler);
-	});
-
 	try {
 		// https://scrapbox.io/discordjs-japan/ytdl-core_を使用して_YouTube_の音源を配信するサンプル
 		const audioPlayer = createAudioPlayer();
 		subscriptions.set(guild.id, connection.subscribe(audioPlayer));
+		audioPlayer.removeAllListeners("stateChange");
 		
 		if (song.chiptune) {
 			const player = new NsfPlayer(song.chiptune, song.trackNumber || 0);
