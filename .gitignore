@@ -1,4 +1,5 @@
 .dockerignore
+.vscode
 Dockerfile
 node_modules/
 fly.toml
