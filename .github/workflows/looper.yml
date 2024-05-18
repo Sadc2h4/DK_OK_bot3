@@ -1,0 +1,76 @@
+# Runs PyMusicLooper and returns split audio
+
+name: PyMusicLooper
+on:
+  repository_dispatch:
+    types: [ split-audio ]
+jobs:
+  onerror:
+    if: |
+      github.event.client_payload.response_to != '' &&
+      !contains(github.event.client_payload.url, 'youtube.com')
+    runs-on: ubuntu-latest
+    steps:
+    - name: send POST on error
+      run: curl -X POST -F error=1 ${{ github.event.client_payload.response_to }}
+  convert:
+    if: |
+      github.event.client_payload.response_to != '' &&
+      contains(github.event.client_payload.url, 'youtube.com')
+    runs-on: ubuntu-latest
+    steps:
+    - name: get-video-id
+      uses: actions-ecosystem/action-regex-match@v2.0.2
+      id: regex-match
+      with:
+        text: ${{ github.event.client_payload.url }}
+        regex: '[?&]v=(.+)&?.*$'
+    - uses: actions/cache@v3.3.2
+      id: cache
+      with:
+        path: LooperOutput
+        key: >
+          ${{ steps.regex-match.outputs.group1 }}
+          ${{ github.event.client_payload.approx_loop_start }}
+          ${{ github.event.client_payload.approx_loop_end }}
+    - name: place-requirements
+      if: steps.cache.outputs.cache-hit != 'true'
+      run: echo pymusiclooper > ~/work/DK_OK_bot3/DK_OK_bot3/requirements.txt
+    - uses: actions/setup-python@v3
+      if: steps.cache.outputs.cache-hit != 'true'
+      with:
+        python-version: 3.11
+        cache: pip
+    - uses: awalsh128/cache-apt-pkgs-action@latest
+      if: steps.cache.outputs.cache-hit != 'true'
+      with:
+        packages: ffmpeg
+        version: 1.0
+    - name: setup
+      if: steps.cache.outputs.cache-hit != 'true'
+      run: pip install -r requirements.txt
+    - name: run-approx-loop
+      if: |
+        steps.cache.outputs.cache-hit != 'true' &&
+        github.event.client_payload.approx_loop_start != '' &&
+        github.event.client_payload.approx_loop_end != ''
+      run: >
+        python -m pymusiclooper split-audio --approx-loop-position
+        ${{ github.event.client_payload.approx_loop_start }}
+        ${{ github.event.client_payload.approx_loop_end }}
+        --url ${{ github.event.client_payload.url }} --format mp3
+    - name: run
+      if: |
+        steps.cache.outputs.cache-hit != 'true' &&
+        (github.event.client_payload.approx_loop_start == '' ||
+         github.event.client_payload.approx_loop_end == '')
+      run: python -m pymusiclooper split-audio --url ${{ github.event.client_payload.url }} --format mp3
+    - name: compress
+      if: steps.cache.outputs.cache-hit != 'true'
+      working-directory: LooperOutput
+      run: zip -r out.zip *-intro.* *-loop.* *-outro.*
+    - name: send
+      working-directory: LooperOutput
+      run: >
+        curl -X POST -F "src=${{ github.event.client_payload.url }}"
+        -F file=@out.zip ${{ github.event.client_payload.response_to }}

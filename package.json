@@ -1,31 +1,43 @@
 {
-  "name": "dk-ok-bot",
-  "author": "Zenkaku Hiragana and C2H4",
-  "version": "1.0.0",
-  "dependencies": {
-    "@discordjs/opus": "^0.9.0",
-    "@discordjs/voice": "^0.13.0",
-    "discord.js": "^14.6.0",
-    "express": "^4.18.2",
-    "ffmpeg": "^0.0.4",
-    "ffmpeg-static": "^5.1.0",
-    "request": "^2.88.2",
-    "tweetnacl": "^1.0.3",
-    "ytdl-core": "github:khlevon/node-ytdl-core#v4.11.4-patch.2",
-    "ytpl": "^2.3.0"
-  },
-  "description": "",
-  "engines": {
-    "node": "16.x"
-  },
-  "keywords": [],
-  "license": "ISC",
-  "main": "DK_OK_bot.js",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/dk-ok-bot-js.git"
-  },
-  "scripts": {
-    "start": "node ./DK_OK_bot.js"
-  }
+    "name": "dk-ok-bot3",
+    "author": "Zenkaku Hiragana",
+    "version": "1.0.0",
+    "dependencies": {
+        "@discordjs/opus": "github:discordjs/opus",
+        "@discordjs/voice": "^0.17.0",
+        "discord.js": "^14.15.2",
+        "express": "^4.18.2",
+        "ffmpeg": "^0.0.4",
+        "ffmpeg-static": "^5.1.0",
+        "fluent-ffmpeg": "^2.1.2",
+        "multer": "^1.4.5-lts.1",
+        "tweetnacl": "^1.0.3",
+        "unzipper": "^0.10.14",
+        "youtube-sr": "^4.3.11",
+        "ytdl-core": "github:khlevon/node-ytdl-core#v4.11.4-patch.2",
+        "ytpl": "^2.3.0"
+    },
+    "description": "",
+    "keywords": [],
+    "license": "ISC",
+    "main": "main.js",
+    "scripts": {
+        "test": "ts-node src/main.ts",
+        "start": "node build/main.js",
+        "compile": "tsc -p ."
+    },
+    "devDependencies": {
+        "@types/express": "^4.17.21",
+        "@types/fluent-ffmpeg": "^2.1.24",
+        "@types/multer": "^1.4.11",
+        "@types/unzipper": "^0.10.9",
+        "@typescript-eslint/eslint-plugin": "^6.15.0",
+        "eslint": "^8.56.0",
+        "eslint-config-standard-with-typescript": "^43.0.0",
+        "eslint-plugin-import": "^2.29.1",
+        "eslint-plugin-n": "^16.5.0",
+        "eslint-plugin-promise": "^6.1.1",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.3.3"
+    }
 }
