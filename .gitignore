@@ -1,6 +1,5 @@
 .dockerignore
 .vscode
-Dockerfile
 node_modules/
 fly.toml
 package-lock.json
