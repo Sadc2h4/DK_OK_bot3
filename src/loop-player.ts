@@ -1,11 +1,14 @@
 
+import { cwd, env }              from 'process';
+import pathToFFmpeg              from 'ffmpeg-static';
+env.FFMPEG_PATH = pathToFFmpeg ?? env.FFMPEG_PATH ?? undefined;
+
 import express                   from 'express';
 import ffmpeg                    from 'fluent-ffmpeg';
 import fs                        from 'fs';
 import multer                    from 'multer';
 import path                      from 'path';
 import unzipper                  from 'unzipper';
-import { cwd, env }              from 'process';
 import { PassThrough, Readable } from 'stream';
 import { getURLVideoID }         from 'ytdl-core';
 interface LoopFileNames {
@@ -34,11 +37,12 @@ app.post('/dk-ok-bot3/loop', upload.single('file'), (req, res) => {
     let intro: string = '';
     let loop: string = '';
     let outro: string = '';
+    const root = path.join(cwd(), 'LooperOutput/loops');
+    if (!fs.existsSync(root)) fs.mkdirSync(root, { recursive: true });
     console.log(`[POST] Receiving file: ${req.file.path}`);
     fs.createReadStream(req.file.path)
     .pipe(unzipper.Parse()).on('entry', (entry: unzipper.Entry) => {
         console.log(`[FILE] ${entry.path}`);
-        const root = path.join(cwd(), 'LooperOutput/loops');
         const full = path.join(root, entry.path);
         if (entry.path.includes('-intro')) intro = full;
         if (entry.path.includes('-loop'))  loop  = full;

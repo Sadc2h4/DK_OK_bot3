@@ -2,12 +2,13 @@
 import NsfPlayer           from './nsf-player';
 import LoopPlayer          from './loop-player';
 import { sendLoopRequest } from './loop-player';
-import ytpl    from 'ytpl';
-import ytdl    from 'ytdl-core';
-import YouTube from 'youtube-sr';
-import Discord from 'discord.js';
-import path    from 'path';
-import { URL } from "url";
+import ytpl         from 'ytpl';
+import ytdl         from 'ytdl-core';
+import YouTube      from 'youtube-sr';
+import Discord      from 'discord.js';
+import path         from 'path';
+import { URL }      from "url";
+import { Readable } from 'stream';
 import {
     AudioPlayerState,
     AudioPlayerStatus,
@@ -125,7 +126,7 @@ async function play(guild: Discord.Guild, song: SongItem) {
         }
         else {
             switch (song.type) {
-                case "YouTube":
+                case "YouTube": {
                     if (!song.url) return;
                     const videoID = ytdl.getURLVideoID(song.url);
                     const info = await ytdl.getInfo(song.url);
@@ -145,17 +146,29 @@ async function play(guild: Discord.Guild, song: SongItem) {
                     durationMs = Number(info.videoDetails.lengthSeconds) * 1000;
                     resource = createAudioResource(stream, { inputType: inputType });
                     break;
-                case "Dropbox":
+                }
+                case "Dropbox": {
                     if (!song.url) return;
-                    resource = createAudioResource(song.url, { inputType: StreamType.Arbitrary });
+                    const res = await fetch(song.url);
+                    if (!res.body) return;
+                    const reader = res.body?.getReader();
+                    const stream = new Readable({
+                        read() {
+                            reader?.read().then(({ done, value }) => this.push(done ? null : value))
+                            .catch(err => this.destroy(err));
+                        }
+                    });
+                    resource = createAudioResource(stream, { inputType: StreamType.Arbitrary });
                     durationMs = resource.playbackDuration;
                     break;
-                case "Chiptune":
+                }
+                case "Chiptune": {
                     if (!song.chiptune) return;
                     const player = new NsfPlayer(song.chiptune, song.trackNumber ?? 0);
                     resource = createAudioResource(player, { inputType: StreamType.Raw });
                     durationMs = -1;
                     break;
+                }
             }
         }
         const initTime = durationMs < 0 ? '-' : (durationMs < ONE_HOUR_MS ? '00:00' : '00:00:00');
