@@ -1,7 +1,6 @@
 .dockerignore
 .vscode
 node_modules/
-fly.toml
 package-lock.json
 token.txt
 LooperOutput
