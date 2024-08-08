@@ -63,6 +63,26 @@ const client = new Discord.Client({
     ]
 });
 
+// ytdlでフォーマットを気にしつつReadableを持ってくる
+export async function getYtdlStream(url: string): Promise<[Readable, ytdl.videoInfo, StreamType]> {
+    const id = ytdl.getURLVideoID(url);
+    const info = await ytdl.getInfo(url);
+    let inputType = StreamType.WebmOpus;
+    let filter: ytdl.Filter = (filter: ytdl.videoFormat) =>
+        filter.audioCodec === "opus" && filter.container === "webm";
+    const formats = ytdl.filterFormats(info.formats, filter);
+    if (formats.length === 0) {
+        inputType = StreamType.Arbitrary;
+        filter = "audio";
+    }
+    const stream = ytdl(id, {
+        highWaterMark: 32 * 1024 * 1024,
+        quality: "lowestaudio",
+        filter: filter
+    });
+    return [stream, info, inputType];
+}
+
 // URLにパラメータfieldがあるかどうかを返す
 function parameterExists(url: string, field: string): boolean {
     return url.indexOf(`?${field}=`) != -1 || url.indexOf(`&${field}=`) != -1;
@@ -100,8 +120,8 @@ function shuffle(interaction: Discord.Interaction, gag?: boolean) {
     }
 
     if (gag) return;
-    interaction.editReply("Shuffled the queue!");
-    setTimeout(() => { interaction.deleteReply(); }, 1000 * 5);
+    interaction.editReply("Shuffled the queue!").catch(console.error);
+    setTimeout(() => { interaction.deleteReply().catch(console.error); }, 1000 * 5);
 }
 
 // 再生キューから曲を取り出し再生する。再生が終わるとキューから消去される。
@@ -128,23 +148,9 @@ async function play(guild: Discord.Guild, song: SongItem) {
             switch (song.type) {
                 case "YouTube": {
                     if (!song.url) return;
-                    const videoID = ytdl.getURLVideoID(song.url);
-                    const info = await ytdl.getInfo(song.url);
-                    let inputType = StreamType.WebmOpus;
-                    let filter: ytdl.Filter = (filter: ytdl.videoFormat) =>
-                        filter.audioCodec === "opus" && filter.container === "webm";
-                    const formats = ytdl.filterFormats(info.formats, filter);
-                    if (formats.length === 0) {
-                        inputType = StreamType.Arbitrary;
-                        filter = "audio";
-                    }
-                    const stream = ytdl(videoID, {
-                        highWaterMark: 32 * 1024 * 1024,
-                        quality: "lowestaudio",
-                        filter: filter
-                    });
+                    const [stream, info, inputType] = await getYtdlStream(song.url);
                     durationMs = Number(info.videoDetails.lengthSeconds) * 1000;
-                    resource = createAudioResource(stream, { inputType: inputType });
+                    resource = createAudioResource(stream, { inputType });
                     break;
                 }
                 case "Dropbox": {
@@ -255,7 +261,7 @@ async function play(guild: Discord.Guild, song: SongItem) {
             if (after.status !== "idle") return;
             removed = true;
             clearInterval(id);
-            if (message.deletable) message.delete().catch(() => null);
+            if (message.deletable) message.delete().catch(console.error);
             serverQueue.songs?.shift();
             if (serverQueue.songs.length > 0) {
                 play(guild, serverQueue.songs[0]);
@@ -318,7 +324,7 @@ function pushQueue(interaction: Discord.Interaction, song: SongItem, gag?: boole
         }
     }
     if (gag) return;
-    return interaction.editReply(`**${song.title}** has been added to the queue!`);
+    return interaction.editReply(`**${song.title}** has been added to the queue!`).catch(console.error);
 }
 async function startPlaying(interaction: Discord.Interaction, playLater?: boolean) {
     if (!interaction.inCachedGuild()) return;
@@ -339,7 +345,7 @@ async function startPlaying(interaction: Discord.Interaction, playLater?: boolea
         console.error("Error at playing a song");
         console.error(error);
         if (!interaction.isRepliable()) return;
-        return await interaction.editReply("Failed to play a song!");
+        return await interaction.editReply("Failed to play a song!").catch(console.error);
     }
 }
 async function play_impl(interaction: Discord.Interaction, url: string, aux: string) {
@@ -381,12 +387,12 @@ async function play_impl(interaction: Discord.Interaction, url: string, aux: str
                 }, true, aux === keywords[1] || aux == keywords[2]);
             });
 
-            await interaction.editReply("Added a playlist to the queue!");
+            await interaction.editReply("Added a playlist to the queue!").catch(console.error);
             if (aux == keywords[0]) shuffle(interaction, true);
         }
         catch (error) {
             console.error(error);
-            return await interaction.editReply("I can't fetch playlist info!");
+            return await interaction.editReply("I can't fetch playlist info!").catch(console.error);
         }
     }
     else if (validVideo) { // 曲の追加
@@ -405,7 +411,7 @@ async function play_impl(interaction: Discord.Interaction, url: string, aux: str
         }
         catch (error) {
             console.error(error);
-            return await interaction.editReply("I can't fetch video info!");
+            return await interaction.editReply("I can't fetch video info!").catch(console.error);
         }
     }
     else { // 曲の検索
@@ -423,15 +429,15 @@ functionTable.set("play", async function(interaction: Discord.Interaction) {
     if (!interaction.isChatInputCommand()) return;
     if (!interaction.isRepliable()) return;
     if (!interaction.inCachedGuild()) return;
-    setTimeout(() => { interaction.deleteReply(); }, 1000 * 5);
+    setTimeout(() => { interaction.deleteReply().catch(console.error); }, 1000 * 5);
     const voiceChannel = interaction.member?.voice.channel;
     const permissions = voiceChannel?.permissionsFor(interaction.client.user);
     if (!voiceChannel) {
-        return await interaction.editReply("You need to be in a voice channel to play music!");
+        return await interaction.editReply("You need to be in a voice channel to play music!").catch(console.error);
     }
     if (!permissions?.has(Discord.PermissionsBitField.Flags.Connect)
     ||  !permissions?.has(Discord.PermissionsBitField.Flags.Speak)) {
-        return await interaction.editReply("I need the permissions to join and speak in your voice channel!");
+        return await interaction.editReply("I need the permissions to join and speak in your voice channel!").catch(console.error);
     }
 
     // optionの解析
@@ -446,7 +452,7 @@ functionTable.set("skip", function(interaction: Discord.Interaction) {
     const ss = subscriptions.get(interaction.guild.id);
     if (!ss?.player) return;
     ss.player.stop();
-    interaction.deleteReply();
+    interaction.deleteReply().catch(console.error);
 });
 // 曲の再生を止め、再生キューを消去し、VCから抜ける
 functionTable.set("stop", function(interaction: Discord.Interaction) {
@@ -460,7 +466,7 @@ functionTable.set("stop", function(interaction: Discord.Interaction) {
     if (connection) connection.destroy();
     if (serverQueue) queue.delete(id);
     if (ss) subscriptions.delete(id);
-    interaction.deleteReply();
+    interaction.deleteReply().catch(console.error);
 });
 // 再生キューを全消去する
 functionTable.set("clear", function(interaction: Discord.Interaction) {
@@ -469,7 +475,7 @@ functionTable.set("clear", function(interaction: Discord.Interaction) {
     const serverQueue = queue.get(interaction.guild.id);
     if (!serverQueue) return;
     serverQueue.songs = [];
-    interaction.deleteReply();
+    interaction.deleteReply().catch(console.error);
 });
 // 再生キューをチャットに表示する 多すぎると送れないので15件まで出す
 functionTable.set("queue", function(interaction: Discord.Interaction) { 
@@ -478,8 +484,8 @@ functionTable.set("queue", function(interaction: Discord.Interaction) {
     const serverQueue = queue.get(interaction.guild.id);
     const songs = serverQueue?.songs;
     if (!songs || songs.length == 0) {
-        interaction.editReply("No queue here!");
-        setTimeout(() => { interaction.deleteReply(); }, 1000 * 5);
+        interaction.editReply("No queue here!").catch(console.error);
+        setTimeout(() => { interaction.deleteReply().catch(console.error); }, 1000 * 5);
         return;
     }
 
@@ -491,8 +497,8 @@ functionTable.set("queue", function(interaction: Discord.Interaction) {
             break;
         }
     }
-    interaction.editReply(msg);
-    setTimeout(() => { interaction.deleteReply(); }, 1000 * 30);
+    interaction.editReply(msg).catch(console.error);
+    setTimeout(() => { interaction.deleteReply().catch(console.error); }, 1000 * 30);
 });
 // 次の曲を表示する
 functionTable.set("upnext", function(interaction: Discord.Interaction) {
@@ -501,18 +507,18 @@ functionTable.set("upnext", function(interaction: Discord.Interaction) {
     const serverQueue = queue.get(interaction.guild.id);
     const songs = serverQueue?.songs;
     if (!songs || songs.length < 2) {
-        interaction.editReply("No song to play next!");
+        interaction.editReply("No song to play next!").catch(console.error);
     }
     else {
-        interaction.editReply(`Up next ~ **${songs[1].title}**\n${songs[1].url}`);
+        interaction.editReply(`Up next ~ **${songs[1].title}**\n${songs[1].url}`).catch(console.error);
     }
-    setTimeout(() => { interaction.deleteReply(); }, 1000 * 5);
+    setTimeout(() => { interaction.deleteReply().catch(console.error); }, 1000 * 5);
 });
 // NSFを再生する
 functionTable.set("chiptune", async function(interaction: Discord.Interaction) {
     if (!interaction.isRepliable()) return;
     if (!interaction.isChatInputCommand()) return;
-    setTimeout(() => { interaction.deleteReply(); }, 1000 * 5);
+    setTimeout(() => { interaction.deleteReply().catch(console.error); }, 1000 * 5);
     const att = interaction.options.getAttachment('chiptune');
     const aux = interaction.options.getString('option');
     const track = interaction.options.getInteger('track') ?? undefined;
@@ -520,7 +526,7 @@ functionTable.set("chiptune", async function(interaction: Discord.Interaction) {
     const response = await fetch(att?.url ?? "");
     if (response.status !== 200) {
         console.error("Failed to load NSF", response.status);
-        return interaction.editReply("Failed to load NSF!");
+        return interaction.editReply("Failed to load NSF!").catch(console.error);
     }
     const buffer = await response.arrayBuffer();
     pushQueue(interaction, {
@@ -557,13 +563,13 @@ client.on('interactionCreate', async interaction => {
 client.on('interactionCreate', async interaction => {
     if (interaction.isStringSelectMenu()) {
         await interaction.reply('｡ﾟ(ﾟ´ω`ﾟ)ﾟ｡');
-        setTimeout(() => { interaction.deleteReply(); }, 1);
+        setTimeout(() => { interaction.deleteReply().catch(console.error); }, 1);
         return;
     }
 
     if (!interaction.isModalSubmit()) return;
     await interaction.reply('｡ﾟ(ﾟ´ω`ﾟ)ﾟ｡');
-    setTimeout(() => { interaction.deleteReply(); }, 1000 * 5);
+    setTimeout(() => { interaction.deleteReply().catch(console.error); }, 1000 * 5);
     const url = interaction.fields.getTextInputValue('txt_search');
     await play_impl(interaction, url, '');
 });
